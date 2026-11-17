@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>Rust & Chrome Automotives: 3D Hybrid-Casual Simulator</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   GLOBAL STYLES & UI RESET
+   ═══════════════════════════════════════════════════════════════ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  overflow: hidden;
+  background: #080810;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  color: #fff;
+}
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOP HUD
+   ═══════════════════════════════════════════════════════════════ */
+#hud-top {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 64px;
+  background: linear-gradient(180deg, rgba(10,12,20,0.92) 0%, rgba(10,12,20,0.4) 80%, transparent 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  z-index: 100;
+  pointer-events: none;
+}
+#cash-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#cash-icon {
+  font-size: 26px;
+  filter: drop-shadow(0 0 8px rgba(0,255,100,0.6));
+}
+#cash-display {
+  font-size: 30px;
+  font-weight: 900;
+  color: #39ff74;
+  text-shadow: 0 0 14px rgba(57,255,116,0.6), 0 2px 6px rgba(0,0,0,0.9);
+  letter-spacing: 1px;
+  font-family: 'Arial Black', Impact, sans-serif;
+}
+#phase-display {
+  text-align: center;
+}
+.phase-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 14px;
+  background: rgba(0,240,255,0.15);
+  border: 1px solid rgba(0,240,255,0.5);
+  color: #00f0ff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(0,240,255,0.7);
+}
+.tier-badge {
+  font-size: 11px;
+  color: #aaa;
+  margin-top: 2px;
+  font-weight: 600;
+}
+#stats-display {
+  text-align: right;
+  font-size: 12px;
+  color: #889;
+}
+#stats-display .count {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  font-family: 'Arial Black', Impact, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CORPORATE BUYOUT / PRESTIGE BANNER
+   ═══════════════════════════════════════════════════════════════ */
+#prestige-btn {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff0077, #ffbb00 50%, #00f0ff 100%);
+  background-size: 200% 200%;
+  color: #000;
+  font-weight: 900;
+  font-size: 15px;
+  padding: 12px 30px;
+  border: 2px solid #fff;
+  border-radius: 30px;
+  cursor: pointer;
+  z-index: 120;
+  display: none;
+  box-shadow: 0 0 30px rgba(255,0,120,0.8), 0 4px 15px rgba(0,0,0,0.7);
+  animation: pulse-buyout 1.2s ease-in-out infinite, gradient-shift 3s ease infinite;
+  pointer-events: auto;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+@keyframes pulse-buyout {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.08); box-shadow: 0 0 45px rgba(255,200,0,0.95); }
+}
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOTTOM UPGRADE DOCK
+   ═══════════════════════════════════════════════════════════════ */
+#upgrade-dock {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 95px;
+  background: linear-gradient(0deg, rgba(8,10,18,0.96) 0%, rgba(12,16,28,0.85) 80%, transparent 100%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  z-index: 100;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#upgrade-dock::-webkit-scrollbar { display: none; }
+
+.upgrade-card {
+  flex: 0 0 auto;
+  width: 110px;
+  height: 76px;
+  background: rgba(22, 28, 48, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  transition: transform 0.1s, border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+}
+.upgrade-card:active {
+  transform: scale(0.94);
+}
+.upgrade-card.affordable {
+  border-color: #39ff74;
+  background: rgba(18, 50, 32, 0.6);
+  box-shadow: 0 0 14px rgba(57,255,116,0.25);
+}
+.upgrade-card.affordable .cost {
+  color: #39ff74;
+  font-weight: 800;
+}
+.upgrade-card.unaffordable {
+  opacity: 0.6;
+  border-color: rgba(255,255,255,0.08);
+}
+.upgrade-card.maxed {
+  opacity: 0.45;
+  border-color: #555;
+  background: rgba(20,20,25,0.5);
+  cursor: default;
+}
+.upgrade-card .icon-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 18px;
+}
+.upgrade-card .name {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ccd;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.upgrade-card .lvl {
+  font-size: 11px;
+  font-weight: 800;
+  color: #00f0ff;
+}
+.upgrade-card .cost {
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FLOATING TEXT NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════════ */
+.float-tag {
+  position: fixed;
+  pointer-events: none;
+  z-index: 250;
+  font-size: 20px;
+  font-weight: 900;
+  color: #39ff74;
+  text-shadow: 0 0 10px rgba(57,255,116,0.8), 0 2px 4px #000;
+  font-family: 'Arial Black', Impact, sans-serif;
+  transform: translate(-50%, -50%);
+  animation: float-rise 0.9s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+@keyframes float-rise {
+  0% { transform: translate(-50%, -20%) scale(0.6); opacity: 0; }
+  20% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  80% { opacity: 1; }
+  100% { transform: translate(-50%, -120px) scale(0.9); opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TUTORIAL BANNER
+   ═══════════════════════════════════════════════════════════════ */
+#tutorial-box {
+  position: fixed;
+  top: 75px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(12, 16, 28, 0.88);
+  border: 1.5px solid #00f0ff;
+  border-radius: 20px;
+  padding: 10px 22px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  z-index: 110;
+  pointer-events: none;
+  box-shadow: 0 0 20px rgba(0,240,255,0.3);
+  transition: opacity 0.4s, transform 0.4s;
+  max-width: 90vw;
+}
+#tutorial-box.hidden {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-15px);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CINEMATIC / FLASH OVERLAY
+   ═══════════════════════════════════════════════════════════════ */
+#cinematic-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #fff;
+  z-index: 600;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.8s ease;
+}
+#cinematic-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+#cinematic-text {
+  font-size: 44px;
+  font-weight: 900;
+  color: #111;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-family: 'Arial Black', Impact, sans-serif;
+  text-align: center;
+}
+#cinematic-sub {
+  font-size: 20px;
+  font-weight: 700;
+  color: #555;
+  margin-top: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   VIRTUAL JOYSTICK
+   ═══════════════════════════════════════════════════════════════ */
+#joy-zone {
+  position: fixed;
+  bottom: 0; left: 0;
+  width: 50vw; height: 50vh;
+  z-index: 90;
+}
+.joy-base {
+  position: fixed;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,240,255,0.12) 0%, rgba(255,255,255,0.04) 70%, transparent 100%);
+  border: 2px solid rgba(0,240,255,0.4);
+  box-shadow: 0 0 20px rgba(0,240,255,0.2);
+  display: none;
+  z-index: 91;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+.joy-knob {
+  position: fixed;
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #00f0ff 0%, rgba(0,240,255,0.6) 80%);
+  box-shadow: 0 0 15px #00f0ff;
+  border: 2px solid #fff;
+  display: none;
+  z-index: 92;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   START SCREEN OVERLAY
+   ═══════════════════════════════════════════════════════════════ */
+#start-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(circle at center, #1b2038 0%, #080911 100%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 24px;
+}
+#start-screen h1 {
+  font-size: 52px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 35px #00f0ff, 0 0 70px #ff0077;
+  letter-spacing: 2px;
+  font-family: 'Arial Black', Impact, sans-serif;
+  text-align: center;
+}
+#start-screen .tagline {
+  font-size: 17px;
+  color: #00f0ff;
+  margin-top: 8px;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-shadow: 0 0 10px rgba(0,240,255,0.6);
+}
+#start-screen .lore {
+  max-width: 540px;
+  font-size: 14px;
+  color: #99a;
+  line-height: 1.6;
+  text-align: center;
+  margin-bottom: 35px;
+}
+#start-screen .tap-pill {
+  padding: 14px 38px;
+  border-radius: 30px;
+  background: linear-gradient(90deg, #ff0077, #00f0ff);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  box-shadow: 0 0 25px rgba(0,240,255,0.5);
+  animation: pulse-tap 1.4s ease-in-out infinite;
+}
+@keyframes pulse-tap {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); box-shadow: 0 0 40px rgba(255,0,119,0.8); }
+}
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start-screen">
+  <h1>RUST & CHROME</h1>
+  <div class="tagline">3D Hybrid-Casual Garage Simulator</div>
+  <div class="lore">
+    Scavenge rusted frames from the junkyard & stack them comically high. Dump them into the high-speed Chrome Tunnel to strip rust, weld parts, and spray neon paint. Sell pristine vehicles to billionaire VIPs and pivot your empire to Yachts and Supersonic Jets!
+  </div>
+  <div class="tap-pill">TAP TO START RESTORING</div>
+</div>
+
+<!-- TOP HUD -->
+<div id="hud-top">
+  <div id="cash-container">
+    <div id="cash-icon">💰</div>
+    <div id="cash-display">$0</div>
+  </div>
+  <div id="phase-display">
+    <div class="phase-badge" id="phase-badge">Phase 1: Dirt Lot</div>
+    <div class="tier-badge" id="tier-badge">Tier 1: Classic Sedan</div>
+  </div>
+  <div id="stats-display">
+    <div>RESTORED</div>
+    <span class="count" id="built-count">0</span>
+  </div>
+</div>
+
+<!-- PRESTIGE / BUYOUT BUTTON -->
+<button id="prestige-btn" onclick="triggerPrestigeCinematic()">🚁 CORPORATE BUYOUT → NEXT INDUSTRY</button>
+
+<!-- TUTORIAL BOX -->
+<div id="tutorial-box" class="hidden"></div>
+
+<!-- UPGRADE DOCK -->
+<div id="upgrade-dock"></div>
+
+<!-- CINEMATIC OVERLAY -->
+<div id="cinematic-overlay">
+  <div id="cinematic-text">CORPORATE BUYOUT</div>
+  <div id="cinematic-sub">Airlifting Operation In Progress</div>
+</div>
+
+<!-- JOYSTICK UI -->
+<div id="joy-zone"></div>
+<div class="joy-base" id="joy-base"></div>
+<div class="joy-knob" id="joy-knob"></div>
+
+<!-- THREE.JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   RUST & CHROME: COMPLETE SIMULATION & ENGINE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+// ─── STATE MANAGEMENT ──────────────────────────────────────────────────────
+const G = {
+  cash: 0,
+  totalBuilt: 0,
+  phase: 0, // 0 = Automotive, 1 = Luxury Drydock (Yachts), 2 = Aerospace (Planes)
+  prestigeMultiplier: 1,
+  cinematicActive: false,
+  upgrades: {
+    stackCap:    { level: 0, maxLevel: 9,  baseCost: 40,  getValue: l => 3 + l * 2 },
+    moveSpeed:   { level: 0, maxLevel: 8,  baseCost: 35,  getValue: l => 6.0 + l * 0.9 },
+    tunnelSpeed: { level: 0, maxLevel: 9,  baseCost: 75,  getValue: l => Math.max(450, 4500 - l * 420) },
+    vacuumRad:   { level: 0, maxLevel: 8,  baseCost: 50,  getValue: l => 3.5 + l * 1.2 },
+    helpers:     { level: 0, maxLevel: 4,  baseCost: 150, getValue: l => l },
+    tunnelTier:  { level: 0, maxLevel: 3,  baseCost: 400, getValue: l => Math.min(3, l + 1) },
+  },
+  tutorialStep: 0,
+};
+
+const PHASE_CONFIGS = [
+  {
+    name: 'Classic Automotives',
+    tag: 'Phase 1: Dirt Lot',
+    scrapName: 'Rusted Chassis',
+    mult: 1,
+    tiers: [
+      { name: 'Classic Sedan', min: 45, max: 120 },
+      { name: 'Roaring Muscle', min: 280, max: 750 },
+      { name: 'Neon Hypercar', min: 2200, max: 5500 },
+    ],
+    groundColor: 0x423126,
+    showroomColor: 0x141624,
+    skyColor: 0x101322,
+    prestigeNext: 'Luxury Drydock (Yachts)',
+  },
+  {
+    name: 'Luxury Marine Drydock',
+    tag: 'Phase 2: Coastal Marina',
+    scrapName: 'Sunken Shipwrecks',
+    mult: 2,
+    tiers: [
+      { name: 'Fiberglass Speedboat', min: 1200, max: 3200 },
+      { name: 'Twin-Deck Cruiser', min: 6500, max: 18000 },
+      { name: 'Billionaire Mega-Yacht', min: 45000, max: 130000 },
+    ],
+    groundColor: 0x0c2538,
+    showroomColor: 0x081a28,
+    skyColor: 0x081724,
+    prestigeNext: 'Aerospace Ambitions (Jets)',
+  },
+  {
+    name: 'Aerospace Hangar & Runway',
+    tag: 'Phase 3: Desert Airbase',
+    scrapName: 'Crashed Fuselages',
+    mult: 5,
+    tiers: [
+      { name: 'Vintage Monoplane', min: 35000, max: 95000 },
+      { name: 'Executive Luxury Jet', min: 180000, max: 480000 },
+      { name: 'Hypersonic Hovercraft', min: 1200000, max: 3500000 },
+    ],
+    groundColor: 0x2e2b26,
+    showroomColor: 0x1a1a20,
+    skyColor: 0x181824,
+    prestigeNext: 'Max Prestige Reached',
+  }
+];
+
+function getCurrentTier() {
+  return G.upgrades.tunnelTier.getValue(G.upgrades.tunnelTier.level);
+}
+
+function getUpgradeCost(key) {
+  const u = G.upgrades[key];
+  if (key === 'tunnelTier') {
+    // 3 upgrades: Level 0->1 ($400, unlocks Tier 2), Level 1->2 ($2200, unlocks Tier 3), Level 2->3 ($12000, Corporate Buyout Ready)
+    return [400, 2200, 12000][u.level] || Infinity;
+  }
+  return Math.floor(u.baseCost * Math.pow(1.85, u.level));
+}
+
+function formatCash(n) {
+  if (n < 1000) return '$' + Math.floor(n);
+  if (n < 1e6) return '$' + (n / 1e3).toFixed(1) + 'K';
+  if (n < 1e9) return '$' + (n / 1e6).toFixed(1) + 'M';
+  if (n < 1e12) return '$' + (n / 1e9).toFixed(1) + 'B';
+  return '$' + (n / 1e12).toFixed(1) + 'T';
+}
+
+// ─── THREE.JS INITIALIZATION ───────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(PHASE_CONFIGS[0].skyColor);
+scene.fog = new THREE.FogExp2(PHASE_CONFIGS[0].skyColor, 0.015);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 250);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+// ─── LIGHTING SETUP ────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x606585, 0.85);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+sunLight.position.set(15, 32, 18);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -40;
+sunLight.shadow.camera.right = 40;
+sunLight.shadow.camera.top = 25;
+sunLight.shadow.camera.bottom = -25;
+sunLight.shadow.camera.near = 5;
+sunLight.shadow.camera.far = 90;
+sunLight.shadow.bias = -0.0005;
+scene.add(sunLight);
+
+// Tunnel accent lights
+const tunnelLightL = new THREE.PointLight(0x00f0ff, 1.4, 18);
+tunnelLightL.position.set(-1, 3.8, 0);
+scene.add(tunnelLightL);
+
+const tunnelLightR = new THREE.PointLight(0xff0077, 1.2, 18);
+tunnelLightR.position.set(5, 3.8, 0);
+scene.add(tunnelLightR);
+
+// ─── MATERIALS PALETTE ─────────────────────────────────────────────────────
+const MAT = {
+  rust: new THREE.MeshStandardMaterial({ color: 0x824424, roughness: 0.95, metalness: 0.2 }),
+  rustScrap: new THREE.MeshStandardMaterial({ color: 0x9b542e, roughness: 0.9, metalness: 0.25 }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xeeeeff, roughness: 0.08, metalness: 0.95 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x66ccff, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.35 }),
+  neonCyan: new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.8 }),
+  neonPink: new THREE.MeshStandardMaterial({ color: 0xff0077, emissive: 0xff0077, emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.8 }),
+  neonYellow: new THREE.MeshStandardMaterial({ color: 0xffea00, emissive: 0xffea00, emissiveIntensity: 1.0, roughness: 0.2, metalness: 0.8 }),
+  neonGreen: new THREE.MeshStandardMaterial({ color: 0x39ff74, emissive: 0x39ff74, emissiveIntensity: 0.9, roughness: 0.2, metalness: 0.8 }),
+  conveyor: new THREE.MeshStandardMaterial({ color: 0x282c37, roughness: 0.5, metalness: 0.4 }),
+  frameMetal: new THREE.MeshStandardMaterial({ color: 0x4a5063, roughness: 0.35, metalness: 0.85 }),
+  cashGreen: new THREE.MeshStandardMaterial({ color: 0x27ae60, roughness: 0.4, metalness: 0.3, emissive: 0x1b7a43, emissiveIntensity: 0.3 }),
+  skin: new THREE.MeshStandardMaterial({ color: 0xffcd94, roughness: 0.7, metalness: 0 }),
+  overalls: new THREE.MeshStandardMaterial({ color: 0x224499, roughness: 0.8, metalness: 0.1 }),
+  cap: new THREE.MeshStandardMaterial({ color: 0xdd2233, roughness: 0.6, metalness: 0.1 }),
+  vipSuit: new THREE.MeshStandardMaterial({ color: 0x181820, roughness: 0.3, metalness: 0.5 }),
+  helperVest: new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.6, metalness: 0.1, emissive: 0xcc4400, emissiveIntensity: 0.2 }),
+  pedestal: new THREE.MeshStandardMaterial({ color: 0x1d2232, roughness: 0.25, metalness: 0.8 }),
+  water: new THREE.MeshStandardMaterial({ color: 0x0a4066, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.85 }),
+};
+
+// ─── GEOMETRY CACHE ────────────────────────────────────────────────────────
+const GEO = {
+  box02: new THREE.BoxGeometry(0.25, 0.25, 0.25),
+  box04: new THREE.BoxGeometry(0.4, 0.4, 0.4),
+  box1: new THREE.BoxGeometry(1, 1, 1),
+  cylPedestal: new THREE.CylinderGeometry(1.65, 1.9, 0.35, 24),
+  cylArm: new THREE.CylinderGeometry(0.08, 0.08, 1.8, 8),
+  sphereTip: new THREE.SphereGeometry(0.22, 10, 8),
+  capsuleBody: new THREE.CylinderGeometry(0.32, 0.32, 1.2, 10),
+  headSphere: new THREE.SphereGeometry(0.38, 12, 10),
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WORLD ENVIRONMENT CREATION
+// ═══════════════════════════════════════════════════════════════════════════
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
+let scrapyardFloor, midFloor, showroomFloor;
+const decorativeProps = [];
+
+function buildEnvironment(phaseIdx) {
+  const conf = PHASE_CONFIGS[phaseIdx];
+  scene.background.setHex(conf.skyColor);
+  scene.fog.color.setHex(conf.skyColor);
+
+  // Clear existing environment props
+  decorativeProps.forEach(p => scene.remove(p));
+  decorativeProps.length = 0;
+
+  if (scrapyardFloor) worldGroup.remove(scrapyardFloor);
+  if (midFloor) worldGroup.remove(midFloor);
+  if (showroomFloor) worldGroup.remove(showroomFloor);
+
+  // 1. Scrapyard Floor (x: -28 to -8)
+  const scrapMat = new THREE.MeshStandardMaterial({ color: conf.groundColor, roughness: 0.95 });
+  scrapyardFloor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), scrapMat);
+  scrapyardFloor.rotation.x = -Math.PI / 2;
+  scrapyardFloor.position.set(-18, 0, 0);
+  scrapyardFloor.receiveShadow = true;
+  worldGroup.add(scrapyardFloor);
+
+  // 2. Middle Factory / Conveyor Floor (x: -8 to 8)
+  const factoryMat = new THREE.MeshStandardMaterial({ color: 0x333742, roughness: 0.6, metalness: 0.2 });
+  midFloor = new THREE.Mesh(new THREE.PlaneGeometry(16, 24), factoryMat);
+  midFloor.rotation.x = -Math.PI / 2;
+  midFloor.position.set(0, 0, 0);
+  midFloor.receiveShadow = true;
+  worldGroup.add(midFloor);
+
+  // 3. Showroom Floor (x: 8 to 28)
+  const showMat = phaseIdx === 1 ? MAT.water : new THREE.MeshStandardMaterial({ color: conf.showroomColor, roughness: 0.15, metalness: 0.7 });
+  showroomFloor = new THREE.Mesh(new THREE.PlaneGeometry(22, 24), showMat);
+  showroomFloor.rotation.x = -Math.PI / 2;
+  showroomFloor.position.set(18, 0, 0);
+  showroomFloor.receiveShadow = true;
+  worldGroup.add(showroomFloor);
+
+  // Decorative features according to Phase
+  if (phaseIdx === 0) {
+    // Dirt lot tires and oil drums
+    for (let i = 0; i < 18; i++) {
+      const tire = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.25, 12), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 }));
+      tire.position.set(-27 + Math.random() * 16, 0.2, -9 + Math.random() * 18);
+      tire.rotation.x = Math.PI / 2;
+      tire.rotation.z = Math.random() * Math.PI;
+      scene.add(tire);
+      decorativeProps.push(tire);
+    }
+  } else if (phaseIdx === 1) {
+    // Marina wooden dock planks around pedestals
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x6e492f, roughness: 0.8 });
+    for (let x = 10; x <= 22; x += 4) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.3, 16), woodMat);
+      pier.position.set(x, 0.1, 0);
+      pier.receiveShadow = true;
+      scene.add(pier);
+      decorativeProps.push(pier);
+    }
+  } else if (phaseIdx === 2) {
+    // Airport runway painted centerline & edge lights
+    const lineMat = new THREE.MeshStandardMaterial({ color: 0xffea00, emissive: 0xffea00, emissiveIntensity: 0.6 });
+    for (let x = 9; x <= 25; x += 3) {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.35), lineMat);
+      line.rotation.x = -Math.PI / 2;
+      line.position.set(x, 0.02, 0);
+      scene.add(line);
+      decorativeProps.push(line);
+    }
+  }
+}
+
+// ─── INTAKE HOPPER ─────────────────────────────────────────────────────────
+const hopperGroup = new THREE.Group();
+const hopperCone = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.8, 2.6, 12, 1, true), MAT.frameMetal);
+hopperCone.position.y = 2.4;
+hopperGroup.add(hopperCone);
+
+const hopperRim = new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.12, 8, 24), MAT.neonCyan);
+hopperRim.rotation.x = Math.PI / 2;
+hopperRim.position.y = 3.7;
+hopperGroup.add(hopperRim);
+
+for (let i = 0; i < 4; i++) {
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.4, 8), MAT.frameMetal);
+  const ang = (i * Math.PI) / 2 + Math.PI / 4;
+  leg.position.set(Math.cos(ang) * 1.3, 0.7, Math.sin(ang) * 1.3);
+  hopperGroup.add(leg);
+}
+hopperGroup.position.set(-6, 0, 0);
+scene.add(hopperGroup);
+
+// ─── CONVEYOR SYSTEM ───────────────────────────────────────────────────────
+const conveyorGroup = new THREE.Group();
+const beltMesh = new THREE.Mesh(new THREE.BoxGeometry(11, 0.22, 1.8), MAT.conveyor);
+beltMesh.position.set(1.5, 0.6, 0);
+beltMesh.receiveShadow = true;
+conveyorGroup.add(beltMesh);
+
+// Side rails with neon trim
+for (let z of [-1.02, 1.02]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.45, 0.12), MAT.frameMetal);
+  rail.position.set(1.5, 0.8, z);
+  conveyorGroup.add(rail);
+
+  const neonStripe = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.08, 0.05), MAT.neonCyan);
+  neonStripe.position.set(1.5, 1.0, z);
+  conveyorGroup.add(neonStripe);
+}
+scene.add(conveyorGroup);
+
+// ─── CHROME TUNNEL STRUCTURE ───────────────────────────────────────────────
+const tunnelGroup = new THREE.Group();
+scene.add(tunnelGroup);
+
+const roboticArms = [];
+const polishDrones = [];
+const tunnelLasers = [];
+
+function rebuildTunnelStructure() {
+  while (tunnelGroup.children.length) tunnelGroup.remove(tunnelGroup.children[0]);
+  roboticArms.forEach(a => scene.remove(a.group));
+  roboticArms.length = 0;
+  polishDrones.forEach(d => scene.remove(d.mesh));
+  polishDrones.length = 0;
+  tunnelLasers.length = 0;
+
+  const tier = getCurrentTier();
+
+  // Glass Enclosure & Arch Frames
+  const archPositions = [-3, 0, 3, 6];
+  archPositions.forEach(x => {
+    const arch = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.2, 2.6), MAT.frameMetal);
+    arch.position.set(x, 2.2, 0);
+    tunnelGroup.add(arch);
+  });
+
+  // Level 1: Open framework; Level 2+: Full Curved Glass Walls
+  if (tier >= 2) {
+    for (let z of [-1.3, 1.3]) {
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(9.2, 3.6, 0.08), MAT.glass);
+      glass.position.set(1.5, 2.3, z);
+      tunnelGroup.add(glass);
+    }
+    const glassRoof = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.08, 2.6), MAT.glass);
+    glassRoof.position.set(1.5, 4.2, 0);
+    tunnelGroup.add(glassRoof);
+
+    // Laser emitter tubes
+    const laserMat = new THREE.MeshStandardMaterial({ color: 0xff0044, emissive: 0xff0044, emissiveIntensity: 2.0 });
+    for (let i = 0; i < 2; i++) {
+      const laserBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 2.4, 6), laserMat);
+      laserBeam.rotation.x = Math.PI / 2;
+      laserBeam.position.set(-1.5 + i * 4.5, 2.8, 0);
+      tunnelGroup.add(laserBeam);
+      tunnelLasers.push(laserBeam);
+    }
+  }
+
+  // Level 3: RGB Neon Strip Lighting & Holographic Trims
+  if (tier >= 3) {
+    const stripColors = [0x00f0ff, 0xff0077, 0xffea00, 0x39ff74];
+    for (let i = 0; i < 6; i++) {
+      const c = stripColors[i % stripColors.length];
+      const stripMat = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.5 });
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.1), stripMat);
+      strip.position.set(-2 + i * 1.4, 4.15, 1.2);
+      tunnelGroup.add(strip);
+      const strip2 = strip.clone();
+      strip2.position.z = -1.2;
+      tunnelGroup.add(strip2);
+    }
+  }
+
+  // Robotic Arms Setup
+  const armCount = tier === 1 ? 1 : tier === 2 ? 2 : 4;
+  const armConfigs = [
+    { x: -1.2, z: -1.8, side: -1 },
+    { x: 3.5, z: 1.8, side: 1 },
+    { x: 0.8, z: 1.8, side: 1 },
+    { x: 4.8, z: -1.8, side: -1 },
+  ];
+
+  for (let i = 0; i < armCount; i++) {
+    const cfg = armConfigs[i];
+    const group = new THREE.Group();
+
+    // Base pillar
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.35, 0.8, 8), MAT.frameMetal);
+    base.position.y = 0.4;
+    group.add(base);
+
+    // Shoulder & Upper Arm
+    const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), MAT.neonCyan);
+    shoulder.position.y = 0.9;
+    group.add(shoulder);
+
+    const upperArm = new THREE.Mesh(GEO.cylArm, MAT.frameMetal);
+    upperArm.position.set(0, 1.8, 0);
+    upperArm.rotation.z = cfg.side * 0.3;
+    group.add(upperArm);
+
+    // Elbow & Forearm
+    const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 8), MAT.neonPink);
+    elbow.position.set(cfg.side * -0.5, 2.7, 0);
+    group.add(elbow);
+
+    const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.4, 8), MAT.frameMetal);
+    forearm.position.set(cfg.side * -0.8, 2.3, 0);
+    forearm.rotation.z = cfg.side * -0.7;
+    group.add(forearm);
+
+    // Tool Tip (Welder / Spray Nozzle)
+    const tip = new THREE.Mesh(GEO.sphereTip, tier >= 2 ? MAT.neonYellow : MAT.neonCyan);
+    tip.position.set(cfg.side * -1.3, 1.8, 0);
+    group.add(tip);
+
+    group.position.set(cfg.x, 0, cfg.z);
+    group.userData = {
+      baseX: cfg.x,
+      side: cfg.side,
+      phase: Math.random() * Math.PI * 2,
+      speed: 2.2 + Math.random() * 0.8
+    };
+    scene.add(group);
+    roboticArms.push({ group, tip });
+  }
+
+  // Level 3 Polishing Drones (hovering automated units)
+  if (tier >= 3) {
+    for (let i = 0; i < 3; i++) {
+      const droneMat = new THREE.MeshStandardMaterial({
+        color: 0x00f0ff,
+        emissive: 0x00f0ff,
+        emissiveIntensity: 0.9,
+        roughness: 0.1,
+        metalness: 0.9
+      });
+      const drone = new THREE.Mesh(new THREE.OctahedronGeometry(0.3, 0), droneMat);
+      drone.position.set(-1.0 + i * 2.8, 3.2, (i % 2 === 0 ? 0.6 : -0.6));
+      scene.add(drone);
+      polishDrones.push({ mesh: drone, phase: i * 2.1 });
+    }
+  }
+}
+
+// ─── SHOWROOM ROTATING PEDESTALS ───────────────────────────────────────────
+const pedestals = [];
+const PEDESTAL_COORDS = [
+  { x: 13, z: -5 }, { x: 18, z: -5 }, { x: 23, z: -5 },
+  { x: 13, z: 5 },  { x: 18, z: 5 },  { x: 23, z: 5 },
+];
+
+PEDESTAL_COORDS.forEach(c => {
+  const pMesh = new THREE.Mesh(GEO.cylPedestal, MAT.pedestal);
+  pMesh.position.set(c.x, 0.18, c.z);
+  pMesh.receiveShadow = true;
+  scene.add(pMesh);
+
+  // Neon glowing perimeter ring
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.65, 0.05, 8, 32), MAT.neonCyan);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(c.x, 0.36, c.z);
+  scene.add(ring);
+
+  // Spotlight overhead
+  const spot = new THREE.PointLight(0xffffff, 0.6, 9);
+  spot.position.set(c.x, 6, c.z);
+  scene.add(spot);
+
+  pedestals.push({
+    mesh: pMesh,
+    pos: c,
+    car: null,
+    carMesh: null,
+    tier: 1,
+    occupied: false,
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3D MODELS BUILDERS (Cars, Yachts, Planes & Scrap)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 1. Scrap Item Generator per Phase
+function createScrapMesh(phaseIdx) {
+  const group = new THREE.Group();
+  if (phaseIdx === 0) {
+    // Rusted car chassis / smoking junker frame
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.45, 0.8), MAT.rust);
+    base.position.y = 0.25;
+    group.add(base);
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 0.7), MAT.rustScrap);
+    hood.position.set(0.2, 0.55, 0);
+    group.add(hood);
+    // bent rusty axle
+    const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6), MAT.rust);
+    axle.rotation.z = Math.PI / 2;
+    axle.position.set(-0.4, 0.2, 0);
+    group.add(axle);
+  } else if (phaseIdx === 1) {
+    // Sunken shipwreck rib / barnacle hull fragment
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.65), MAT.rustScrap);
+    hull.rotation.z = 0.2;
+    hull.position.y = 0.3;
+    group.add(hull);
+    const rib = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.1, 6, 12, Math.PI), MAT.rust);
+    rib.rotation.y = Math.PI / 2;
+    rib.position.set(0.1, 0.45, 0);
+    group.add(rib);
+  } else {
+    // Crashed airplane fuselage / bent wing fragment
+    const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.2, 1.6, 8), MAT.rustScrap);
+    fuselage.rotation.z = Math.PI / 3;
+    fuselage.position.y = 0.4;
+    group.add(fuselage);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.5), MAT.rust);
+    wing.rotation.y = 0.3;
+    wing.position.set(-0.2, 0.35, 0);
+    group.add(wing);
+  }
+  return group;
+}
+
+// 2. Finished Vehicle Generator per Phase & Tier
+function createVehicleMesh(phaseIdx, tier) {
+  const group = new THREE.Group();
+
+  if (phaseIdx === 0) {
+    // ─── AUTOMOTIVES ───────────────────────────────────────────────
+    if (tier === 1) {
+      // Classic Sedan: Boxy vintage chassis with chrome bumpers
+      const carMat = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.25, metalness: 0.85 });
+      const bodyB = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.45, 0.95), carMat);
+      bodyB.position.y = 0.45;
+      group.add(bodyB);
+
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.4, 0.82), carMat);
+      roof.position.set(-0.1, 0.82, 0);
+      group.add(roof);
+
+      // Chrome bumpers
+      const bumperF = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 1.05), MAT.chrome);
+      bumperF.position.set(0.98, 0.35, 0);
+      group.add(bumperF);
+      const bumperR = bumperF.clone();
+      bumperR.position.x = -0.98;
+      group.add(bumperR);
+    } else if (tier === 2) {
+      // Muscle Car: Roaring hood scoop blower, racing stance & spoiler
+      const muscleMat = new THREE.MeshStandardMaterial({ color: 0xd63031, roughness: 0.15, metalness: 0.9 });
+      const bodyB = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.45, 1.05), muscleMat);
+      bodyB.position.y = 0.45;
+      group.add(bodyB);
+
+      const fastback = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.38, 0.9), muscleMat);
+      fastback.position.set(-0.25, 0.8, 0);
+      group.add(fastback);
+
+      // Chrome supercharger scoop on hood
+      const scoop = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.22, 0.3), MAT.chrome);
+      scoop.position.set(0.45, 0.76, 0);
+      group.add(scoop);
+
+      // Rear wing spoiler
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 1.15), MAT.chrome);
+      wing.position.set(-1.0, 0.88, 0);
+      group.add(wing);
+    } else {
+      // Hypercar: Sleek aerodynamic wedge, neon underglow & giant diffuser
+      const hyperMat = new THREE.MeshStandardMaterial({
+        color: 0x0984e3,
+        emissive: 0x00f0ff,
+        emissiveIntensity: 0.35,
+        roughness: 0.05,
+        metalness: 0.98
+      });
+      const wedge = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.35, 1.1), hyperMat);
+      wedge.position.y = 0.38;
+      group.add(wedge);
+
+      const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 8), MAT.glass);
+      cockpit.scale.set(1.4, 0.7, 0.9);
+      cockpit.position.set(0.05, 0.65, 0);
+      group.add(cockpit);
+
+      // Carbon rear aerodynamic wing
+      const wing = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 1.3), MAT.chrome);
+      wing.position.set(-1.05, 0.85, 0);
+      group.add(wing);
+
+      // Neon Underglow Light
+      const underglow = new THREE.PointLight(0x00f0ff, 1.5, 4);
+      underglow.position.set(0, 0.15, 0);
+      group.add(underglow);
+    }
+
+    // 4 Wheels for Cars
+    const tireMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+    const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.18, 12);
+    const wx = tier === 3 ? [-0.75, 0.75] : [-0.65, 0.65];
+    for (let x of wx) {
+      for (let z of [-0.54, 0.54]) {
+        const w = new THREE.Mesh(wheelGeo, tireMat);
+        w.rotation.x = Math.PI / 2;
+        w.position.set(x, 0.22, z);
+        group.add(w);
+        const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.19, 8), MAT.chrome);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.set(x, 0.22, z);
+        group.add(rim);
+      }
+    }
+  } else if (phaseIdx === 1) {
+    // ─── LUXURY YACHTS ─────────────────────────────────────────────
+    if (tier === 1) {
+      // Speedboat: V-shaped hull with windscreen & dual outboard motors
+      const boatMat = new THREE.MeshStandardMaterial({ color: 0x00cec9, roughness: 0.15, metalness: 0.8 });
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.45, 0.9), boatMat);
+      hull.position.y = 0.4;
+      group.add(hull);
+
+      const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.8), MAT.glass);
+      windshield.rotation.z = -0.4;
+      windshield.position.set(0.3, 0.7, 0);
+      group.add(windshield);
+
+      const engine = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.5, 0.4), MAT.chrome);
+      engine.position.set(-1.15, 0.45, 0);
+      group.add(engine);
+    } else if (tier === 2) {
+      // Sport Cruiser: Dual-deck cruiser with radar arch
+      const yachtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1, metalness: 0.7 });
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.55, 1.1), yachtMat);
+      hull.position.y = 0.45;
+      group.add(hull);
+
+      const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.45, 0.85), yachtMat);
+      cabin.position.set(-0.1, 0.85, 0);
+      group.add(cabin);
+
+      const radarArch = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 6, 12, Math.PI), MAT.chrome);
+      radarArch.position.set(-0.4, 1.15, 0);
+      group.add(radarArch);
+    } else {
+      // Billionaire Mega-Yacht: 3 decks, teak swim platform & glowing deck pool
+      const megaMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.9 });
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.65, 1.25), megaMat);
+      hull.position.y = 0.5;
+      group.add(hull);
+
+      const deck2 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.45, 1.0), megaMat);
+      deck2.position.set(-0.2, 0.95, 0);
+      group.add(deck2);
+
+      const deck3 = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.35, 0.75), megaMat);
+      deck3.position.set(-0.35, 1.3, 0);
+      group.add(deck3);
+
+      // Glowing blue plunge pool on aft deck
+      const pool = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.6), MAT.neonCyan);
+      pool.position.set(0.9, 0.85, 0);
+      group.add(pool);
+
+      const poolGlow = new THREE.PointLight(0x00f0ff, 1.2, 3);
+      poolGlow.position.set(0.9, 1.0, 0);
+      group.add(poolGlow);
+    }
+  } else {
+    // ─── AEROSPACE & JETS ──────────────────────────────────────────
+    if (tier === 1) {
+      // Vintage Monoplane: Fuselage, wings & rotating nose propeller
+      const planeMat = new THREE.MeshStandardMaterial({ color: 0xe17055, roughness: 0.25, metalness: 0.75 });
+      const fuse = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.18, 2.2, 10), planeMat);
+      fuse.rotation.z = Math.PI / 2;
+      fuse.position.y = 0.5;
+      group.add(fuse);
+
+      const wings = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 2.6), planeMat);
+      wings.position.set(0.2, 0.65, 0);
+      group.add(wings);
+
+      // Tailfin
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.04), planeMat);
+      fin.position.set(-0.95, 0.75, 0);
+      group.add(fin);
+
+      // Nose Propeller
+      const prop = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.75, 0.1), MAT.chrome);
+      prop.position.set(1.15, 0.5, 0);
+      prop.name = 'propeller';
+      group.add(prop);
+    } else if (tier === 2) {
+      // Executive Jet: Swept wings, luxury corporate livery & twin jet turbines
+      const jetMat = new THREE.MeshStandardMaterial({ color: 0x2d3436, roughness: 0.1, metalness: 0.95 });
+      const bodyJ = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.2, 2.6, 12), jetMat);
+      bodyJ.rotation.z = Math.PI / 2;
+      bodyJ.position.y = 0.55;
+      group.add(bodyJ);
+
+      const sweptWings = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 2.8), jetMat);
+      sweptWings.position.set(-0.1, 0.55, 0);
+      group.add(sweptWings);
+
+      // Twin rear turbine engines
+      for (let z of [-0.55, 0.55]) {
+        const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.7, 8), MAT.chrome);
+        engine.rotation.z = Math.PI / 2;
+        engine.position.set(-0.7, 0.7, z);
+        group.add(engine);
+      }
+    } else {
+      // Hypersonic Stealth Cruiser: Delta-wing geometry & glowing afterburners
+      const stealthMat = new THREE.MeshStandardMaterial({
+        color: 0x111118,
+        emissive: 0xff0077,
+        emissiveIntensity: 0.25,
+        roughness: 0.05,
+        metalness: 0.98
+      });
+      const delta = new THREE.Mesh(new THREE.ConeGeometry(1.6, 2.8, 4), stealthMat);
+      delta.rotation.z = -Math.PI / 2;
+      delta.scale.set(1, 0.25, 1.4);
+      delta.position.set(0, 0.55, 0);
+      group.add(delta);
+
+      // Dual glowing afterburners
+      for (let z of [-0.35, 0.35]) {
+        const burner = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.35, 8), MAT.neonPink);
+        burner.rotation.z = Math.PI / 2;
+        burner.position.set(-1.3, 0.55, z);
+        group.add(burner);
+      }
+
+      const thrustGlow = new THREE.PointLight(0xff0077, 2.0, 5);
+      thrustGlow.position.set(-1.5, 0.55, 0);
+      group.add(thrustGlow);
+    }
+  }
+
+  return group;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PLAYER CHARACTER
+// ═══════════════════════════════════════════════════════════════════════════
+const player = new THREE.Group();
+
+// Torso / Overalls
+const playerTorso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.15, 0.5), MAT.overalls);
+playerTorso.position.y = 1.15;
+playerTorso.castShadow = true;
+player.add(playerTorso);
+
+// Head & Cap
+const playerHead = new THREE.Mesh(GEO.headSphere, MAT.skin);
+playerHead.position.y = 2.05;
+playerHead.castShadow = true;
+player.add(playerHead);
+
+const playerCap = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.15, 12), MAT.cap);
+playerCap.position.y = 2.4;
+player.add(playerCap);
+
+// Legs
+const legL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.6, 0.28), MAT.overalls);
+legL.position.set(-0.2, 0.3, 0);
+player.add(legL);
+
+const legR = legL.clone();
+legR.position.x = 0.2;
+player.add(legR);
+
+player.position.set(-14, 0, 0);
+scene.add(player);
+
+let playerStack = 0;
+const stackGroup = new THREE.Group();
+stackGroup.position.set(0, 2.5, 0);
+player.add(stackGroup);
+
+function updateStackVisuals() {
+  while (stackGroup.children.length) stackGroup.remove(stackGroup.children[0]);
+  const cap = G.upgrades.stackCap.getValue(G.upgrades.stackCap.level);
+  for (let i = 0; i < playerStack; i++) {
+    const item = createScrapMesh(G.phase);
+    item.scale.setScalar(0.42);
+    // Alternate stack rotation for comical hybrid-casual balance look
+    item.rotation.y = (i % 2 === 0 ? 0.25 : -0.25) * i;
+    item.position.set(0, i * 0.45, 0);
+    stackGroup.add(item);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCRAP JUNKYARD SPAWNING
+// ═══════════════════════════════════════════════════════════════════════════
+const scrapItems = [];
+const MAX_SCRAP_NODES = 12;
+let lastScrapSpawn = 0;
+
+function spawnScrapNode() {
+  if (scrapItems.length >= MAX_SCRAP_NODES) return;
+  const mesh = createScrapMesh(G.phase);
+  mesh.position.set(
+    -26 + Math.random() * 16,
+    0.3,
+    -8 + Math.random() * 16
+  );
+  mesh.rotation.y = Math.random() * Math.PI * 2;
+  mesh.castShadow = true;
+  scene.add(mesh);
+  scrapItems.push(mesh);
+}
+
+// Initial populate
+for (let i = 0; i < 9; i++) spawnScrapNode();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHROME TUNNEL PROCESSING QUEUE
+// ═══════════════════════════════════════════════════════════════════════════
+const conveyorQueue = [];
+
+function feedHopper() {
+  const mesh = createScrapMesh(G.phase);
+  mesh.scale.setScalar(0.7);
+  mesh.position.set(-5.5, 1.1, 0);
+  scene.add(mesh);
+
+  conveyorQueue.push({
+    mesh,
+    startTime: performance.now(),
+    duration: G.upgrades.tunnelSpeed.getValue(G.upgrades.tunnelSpeed.level),
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIP BIDDERS & HELPER MECHANICS
+// ═══════════════════════════════════════════════════════════════════════════
+const npcs = [];
+let vipTimer = 0;
+const VIP_INTERVAL = 4500;
+
+function createNPCFigure(role) {
+  const group = new THREE.Group();
+  const mat = role === 'vip' ? MAT.vipSuit : MAT.helperVest;
+
+  const b = new THREE.Mesh(GEO.capsuleBody, mat);
+  b.position.y = 0.95;
+  b.castShadow = true;
+  group.add(b);
+
+  const h = new THREE.Mesh(GEO.headSphere, MAT.skin);
+  h.position.y = 1.75;
+  group.add(h);
+
+  if (role === 'vip') {
+    // Dapper hat or sunglasses
+    const fedora = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.12, 10), MAT.vipSuit);
+    fedora.position.y = 2.05;
+    group.add(fedora);
+  } else {
+    // Hardhat
+    const hardhat = new THREE.Mesh(new THREE.SphereGeometry(0.42, 8, 8), MAT.neonYellow);
+    hardhat.position.y = 2.0;
+    group.add(hardhat);
+  }
+
+  return group;
+}
+
+function spawnVIPBidder() {
+  const filled = pedestals.filter(p => p.occupied && p.carMesh);
+  if (filled.length === 0) return;
+  const target = filled[Math.floor(Math.random() * filled.length)];
+
+  const npcMesh = createNPCFigure('vip');
+  const spawnZ = target.pos.z + (Math.random() > 0.5 ? 4 : -4);
+  npcMesh.position.set(target.pos.x + 6, 0, spawnZ);
+  scene.add(npcMesh);
+
+  npcs.push({
+    mesh: npcMesh,
+    role: 'vip',
+    state: 'walking',
+    targetPedestal: target,
+    dest: new THREE.Vector3(target.pos.x, 0, target.pos.z + (spawnZ > target.pos.z ? 1.8 : -1.8)),
+    timer: 0,
+    speed: 3.2,
+  });
+}
+
+// Helper Minions
+const helperMinions = [];
+
+function syncHelperCount() {
+  const targetCount = G.upgrades.helpers.getValue(G.upgrades.helpers.level);
+  while (helperMinions.length < targetCount) {
+    const mesh = createNPCFigure('helper');
+    mesh.position.set(-18 + Math.random() * 4, 0, -4 + Math.random() * 8);
+    scene.add(mesh);
+
+    const stackNode = new THREE.Group();
+    stackNode.position.set(0, 2.2, 0);
+    mesh.add(stackNode);
+
+    helperMinions.push({
+      mesh,
+      stackNode,
+      state: 'scavenge',
+      carrying: 0,
+      cap: 2,
+      targetScrap: null,
+      speed: 4.2,
+    });
+  }
+  while (helperMinions.length > targetCount) {
+    const h = helperMinions.pop();
+    scene.remove(h.mesh);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CASH BUNDLES & AUTO-VACUUM
+// ═══════════════════════════════════════════════════════════════════════════
+const cashBundles = [];
+
+function dropCashStack(x, z, amount) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.25, 0.35), MAT.cashGreen);
+  mesh.position.set(x, 1.2, z);
+  mesh.castShadow = true;
+  scene.add(mesh);
+  cashBundles.push({
+    mesh,
+    amount,
+    birth: performance.now(),
+    vx: (Math.random() - 0.5) * 4,
+    vy: 5 + Math.random() * 3,
+    vz: (Math.random() - 0.5) * 4,
+    grounded: false,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTICLE SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+const particles = [];
+
+function spawnSparks(x, y, z, colorHex, count = 6, speed = 4) {
+  for (let i = 0; i < count; i++) {
+    const pMat = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      emissive: colorHex,
+      emissiveIntensity: 2.0,
+      roughness: 0.1,
+    });
+    const p = new THREE.Mesh(GEO.box02, pMat);
+    p.position.set(x, y, z);
+    scene.add(p);
+    particles.push({
+      mesh: p,
+      vx: (Math.random() - 0.5) * speed,
+      vy: Math.random() * speed + 1,
+      vz: (Math.random() - 0.5) * speed,
+      life: 0.55,
+      maxLife: 0.55,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SYNTHESIZED WEB AUDIO SOUND FX
+// ═══════════════════════════════════════════════════════════════════════════
+let audioContext = null;
+
+function ensureAudio() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+function playSound(type) {
+  if (!audioContext) return;
+  try {
+    const now = audioContext.currentTime;
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+
+    if (type === 'clunk') {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.1);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.start(now); osc.stop(now + 0.12);
+    } else if (type === 'dump') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(90, now);
+      osc.frequency.exponentialRampToValueAtTime(35, now + 0.25);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc.start(now); osc.stop(now + 0.28);
+    } else if (type === 'laser') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(750, now);
+      osc.frequency.exponentialRampToValueAtTime(250, now + 0.08);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+      osc.start(now); osc.stop(now + 0.09);
+    } else if (type === 'cash') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(987, now);
+      osc.frequency.setValueAtTime(1318, now + 0.06);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      osc.start(now); osc.stop(now + 0.18);
+    } else if (type === 'ding') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1760, now);
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+      osc.start(now); osc.stop(now + 0.7);
+    } else if (type === 'fanfare') {
+      // 3 ascending notes
+      [523, 659, 783, 1046].forEach((f, idx) => {
+        const o = audioContext.createOscillator();
+        const g = audioContext.createGain();
+        o.connect(g); g.connect(audioContext.destination);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(f, now + idx * 0.09);
+        g.gain.setValueAtTime(0.18, now + idx * 0.09);
+        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.25);
+        o.start(now + idx * 0.09); o.stop(now + idx * 0.09 + 0.25);
+      });
+    }
+  } catch (e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// UI & UPGRADE PANEL
+// ═══════════════════════════════════════════════════════════════════════════
+const cashEl = document.getElementById('cash-display');
+const phaseBadgeEl = document.getElementById('phase-badge');
+const tierBadgeEl = document.getElementById('tier-badge');
+const builtCountEl = document.getElementById('built-count');
+const prestigeBtnEl = document.getElementById('prestige-btn');
+const tutorialBoxEl = document.getElementById('tutorial-box');
+const upgradeDockEl = document.getElementById('upgrade-dock');
+
+const UPGRADES_META = [
+  { key: 'stackCap',    icon: '📦', name: 'Stack' },
+  { key: 'moveSpeed',   icon: '⚡', name: 'Speed' },
+  { key: 'tunnelSpeed', icon: '⏱️', name: 'Tunnel' },
+  { key: 'vacuumRad',   icon: '🧲', name: 'Vacuum' },
+  { key: 'helpers',     icon: '👷', name: 'Helpers' },
+  { key: 'tunnelTier',  icon: '✨', name: 'Tier Up' },
+];
+
+function buildUpgradeDock() {
+  upgradeDockEl.innerHTML = '';
+  UPGRADES_META.forEach(meta => {
+    const card = document.createElement('div');
+    card.className = 'upgrade-card';
+    card.dataset.key = meta.key;
+    card.onclick = () => buyUpgrade(meta.key);
+    upgradeDockEl.appendChild(card);
+  });
+  refreshUpgradeCards();
+}
+
+function refreshUpgradeCards() {
+  UPGRADES_META.forEach((meta, idx) => {
+    const card = upgradeDockEl.children[idx];
+    if (!card) return;
+    const u = G.upgrades[meta.key];
+    const cost = getUpgradeCost(meta.key);
+    const isMax = u.level >= u.maxLevel;
+
+    card.className = 'upgrade-card' +
+      (isMax ? ' maxed' : (G.cash >= cost ? ' affordable' : ' unaffordable'));
+
+    let costLabel = isMax ? 'MAX' : formatCash(cost);
+    let levelLabel = isMax ? 'MAX' : `Lv.${u.level}`;
+    if (meta.key === 'tunnelTier') {
+      levelLabel = `Tier ${getCurrentTier()}`;
+      if (u.level === 2) costLabel = 'BUYOUT READY';
+    }
+
+    card.innerHTML = `
+      <div class="icon-row"><span>${meta.icon}</span><span class="lvl">${levelLabel}</span></div>
+      <div class="name">${meta.name}</div>
+      <div class="cost">${costLabel}</div>
+    `;
+  });
+}
+
+function buyUpgrade(key) {
+  const u = G.upgrades[key];
+  if (u.level >= u.maxLevel) return;
+  const cost = getUpgradeCost(key);
+  if (G.cash < cost) return;
+
+  G.cash -= cost;
+  u.level++;
+  playSound('fanfare');
+
+  if (key === 'tunnelTier') {
+    rebuildTunnelStructure();
+    showTutorial('🎉 Vehicle Tier Upgraded! Robotic arms & materials enhanced!');
+  } else if (key === 'helpers') {
+    syncHelperCount();
+    showTutorial('👷 Helper Minion deployed to scavenge scrap!');
+  }
+
+  refreshUpgradeCards();
+  updateHUD();
+}
+
+function updateHUD() {
+  cashEl.textContent = formatCash(G.cash);
+  builtCountEl.textContent = G.totalBuilt;
+
+  const conf = PHASE_CONFIGS[G.phase];
+  const tier = getCurrentTier();
+  phaseBadgeEl.textContent = conf.tag;
+  tierBadgeEl.textContent = `Tier ${tier}: ${conf.tiers[tier - 1].name}`;
+
+  // Check Corporate Buyout eligibility
+  // When tunnelTier is level 3, the Corporate Buyout unlocks!
+  if (G.upgrades.tunnelTier.level >= 3 && G.phase < 2) {
+    prestigeBtnEl.style.display = 'block';
+    prestigeBtnEl.textContent = `🚁 CORPORATE BUYOUT → ${conf.prestigeNext}`;
+  } else {
+    prestigeBtnEl.style.display = 'none';
+  }
+}
+
+function showTutorial(text) {
+  tutorialBoxEl.textContent = text;
+  tutorialBoxEl.classList.remove('hidden');
+  clearTimeout(showTutorial._timer);
+  showTutorial._timer = setTimeout(() => {
+    tutorialBoxEl.classList.add('hidden');
+  }, 4500);
+}
+
+function spawnFloatTag(pos3D, text) {
+  const p = pos3D.clone().project(camera);
+  const x = (p.x * 0.5 + 0.5) * window.innerWidth;
+  const y = (-p.y * 0.5 + 0.5) * window.innerHeight;
+
+  const tag = document.createElement('div');
+  tag.className = 'float-tag';
+  tag.textContent = text;
+  tag.style.left = x + 'px';
+  tag.style.top = y + 'px';
+  document.body.appendChild(tag);
+  setTimeout(() => tag.remove(), 950);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CORPORATE BUYOUT CINEMATIC (Helicopter Airlift Pivot)
+// ═══════════════════════════════════════════════════════════════════════════
+const helicopter = new THREE.Group();
+let chopperRotor1, chopperRotor2;
+
+function buildHeavyLiftHelicopter() {
+  while (helicopter.children.length) helicopter.remove(helicopter.children[0]);
+  const bodyH = new THREE.Mesh(new THREE.BoxGeometry(4.5, 1.8, 1.6), MAT.frameMetal);
+  helicopter.add(bodyH);
+
+  // Twin tandem rotors (Sky-crane heavy lift)
+  const rotorMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
+  chopperRotor1 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.08, 0.3), rotorMat);
+  chopperRotor1.position.set(-1.6, 1.2, 0);
+  helicopter.add(chopperRotor1);
+
+  chopperRotor2 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.08, 0.3), rotorMat);
+  chopperRotor2.position.set(1.6, 1.2, 0);
+  helicopter.add(chopperRotor2);
+
+  // High intensity searchlight
+  const spot = new THREE.SpotLight(0xffffff, 4, 30, Math.PI / 4, 0.5);
+  spot.position.set(0, -0.8, 0);
+  spot.target.position.set(0, -10, 0);
+  helicopter.add(spot);
+  helicopter.add(spot.target);
+
+  helicopter.position.set(0, 40, 0);
+  scene.add(helicopter);
+}
+buildHeavyLiftHelicopter();
+
+function triggerPrestigeCinematic() {
+  if (G.cinematicActive || G.phase >= 2) return;
+  G.cinematicActive = true;
+  prestigeBtnEl.style.display = 'none';
+
+  const overlay = document.getElementById('cinematic-overlay');
+  const title = document.getElementById('cinematic-text');
+  const sub = document.getElementById('cinematic-sub');
+
+  title.textContent = 'CORPORATE BUYOUT!';
+  sub.textContent = 'Heavy-Lift Helicopter Airlifting Operation...';
+  overlay.classList.add('active');
+
+  playSound('fanfare');
+
+  // Helicopter descends
+  helicopter.position.set(player.position.x, 28, player.position.z);
+
+  setTimeout(() => {
+    // Reset state & advance industry
+    G.phase++;
+    G.prestigeMultiplier *= PHASE_CONFIGS[G.phase].mult;
+    G.cash = 0;
+    G.totalBuilt = 0;
+
+    // Reset upgrades
+    for (const k in G.upgrades) G.upgrades[k].level = 0;
+
+    // Clear world items
+    scrapItems.forEach(s => scene.remove(s));
+    scrapItems.length = 0;
+    conveyorQueue.forEach(c => scene.remove(c.mesh));
+    conveyorQueue.length = 0;
+    cashBundles.forEach(c => scene.remove(c.mesh));
+    cashBundles.length = 0;
+    pedestals.forEach(p => {
+      if (p.carMesh) scene.remove(p.carMesh);
+      p.carMesh = null;
+      p.occupied = false;
+    });
+    npcs.forEach(n => scene.remove(n.mesh));
+    npcs.length = 0;
+
+    playerStack = 0;
+    updateStackVisuals();
+
+    // Rebuild world & tunnel
+    buildEnvironment(G.phase);
+    rebuildTunnelStructure();
+    syncHelperCount();
+
+    // Spawn fresh scrap
+    for (let i = 0; i < 9; i++) spawnScrapNode();
+
+    // Reset helicopter height
+    helicopter.position.set(0, 45, 0);
+
+    title.textContent = PHASE_CONFIGS[G.phase].name.toUpperCase();
+    sub.textContent = `New Industry Unlocked! Permanent ${G.prestigeMultiplier}x Cash Multiplier!`;
+
+    buildUpgradeDock();
+    updateHUD();
+
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      G.cinematicActive = false;
+      showTutorial(`🚀 Welcome to ${PHASE_CONFIGS[G.phase].name}! Scavenge new materials!`);
+    }, 1800);
+  }, 2200);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INPUT HANDLING: VIRTUAL JOYSTICK & KEYBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+const joystick = { active: false, cx: 0, cy: 0, dx: 0, dy: 0, id: null };
+const joyBaseEl = document.getElementById('joy-base');
+const joyKnobEl = document.getElementById('joy-knob');
+const joyZoneEl = document.getElementById('joy-zone');
+
+function onJoyDown(x, y, id) {
+  joystick.active = true;
+  joystick.cx = x;
+  joystick.cy = y;
+  joystick.dx = 0;
+  joystick.dy = 0;
+  joystick.id = id;
+
+  joyBaseEl.style.display = 'block';
+  joyKnobEl.style.display = 'block';
+  joyBaseEl.style.left = x + 'px';
+  joyBaseEl.style.top = y + 'px';
+  joyKnobEl.style.left = x + 'px';
+  joyKnobEl.style.top = y + 'px';
+}
+
+function onJoyMove(x, y) {
+  if (!joystick.active) return;
+  let ox = x - joystick.cx;
+  let oy = y - joystick.cy;
+  const dist = Math.hypot(ox, oy);
+  const maxR = 48;
+  if (dist > maxR) {
+    ox = (ox / dist) * maxR;
+    oy = (oy / dist) * maxR;
+  }
+  joystick.dx = ox / maxR;
+  joystick.dy = oy / maxR;
+
+  joyKnobEl.style.left = (joystick.cx + ox) + 'px';
+  joyKnobEl.style.top = (joystick.cy + oy) + 'px';
+}
+
+function onJoyUp() {
+  joystick.active = false;
+  joystick.dx = 0;
+  joystick.dy = 0;
+  joystick.id = null;
+  joyBaseEl.style.display = 'none';
+  joyKnobEl.style.display = 'none';
+}
+
+// Touch listeners
+joyZoneEl.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  onJoyDown(t.clientX, t.clientY, t.identifier);
+}, { passive: false });
+
+window.addEventListener('touchmove', e => {
+  if (!joystick.active) return;
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === joystick.id) {
+      onJoyMove(t.clientX, t.clientY);
+      break;
+    }
+  }
+}, { passive: false });
+
+window.addEventListener('touchend', e => {
+  if (!joystick.active) return;
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === joystick.id) {
+      onJoyUp();
+      break;
+    }
+  }
+});
+
+// Mouse dragging fallback
+let mouseActive = false;
+window.addEventListener('mousedown', e => {
+  if (e.target.closest('#upgrade-dock') || e.target.closest('#prestige-btn') || e.target.closest('#start-screen')) return;
+  if (e.clientX < window.innerWidth * 0.55 && e.clientY > window.innerHeight * 0.35) {
+    mouseActive = true;
+    onJoyDown(e.clientX, e.clientY, 'mouse');
+  }
+});
+window.addEventListener('mousemove', e => {
+  if (mouseActive) onJoyMove(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => {
+  if (mouseActive) { mouseActive = false; onJoyUp(); }
+});
+
+// Keyboard controls (WASD / Arrows)
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN GAME LOOP & SIMULATION UPDATE
+// ═══════════════════════════════════════════════════════════════════════════
+let lastTime = 0;
+
+function mainLoop(now) {
+  requestAnimationFrame(mainLoop);
+  if (!lastTime) { lastTime = now; return; }
+  const dt = Math.min((now - lastTime) / 1000, 0.1);
+  lastTime = now;
+
+  if (G.cinematicActive) {
+    // Spin helicopter rotors during cinematic
+    if (chopperRotor1) chopperRotor1.rotation.y += 0.45;
+    if (chopperRotor2) chopperRotor2.rotation.y += 0.45;
+    renderer.render(scene, camera);
+    return;
+  }
+
+  // ─── 1. PLAYER INPUT & MOVEMENT ──────────────────────────────────
+  let moveX = 0, moveZ = 0;
+  if (joystick.active) {
+    moveX = joystick.dx;
+    moveZ = joystick.dy;
+  }
+  if (keys['w'] || keys['arrowup'])    moveZ -= 1;
+  if (keys['s'] || keys['arrowdown'])  moveZ += 1;
+  if (keys['a'] || keys['arrowleft'])  moveX -= 1;
+  if (keys['d'] || keys['arrowright']) moveX += 1;
+
+  const inputDist = Math.hypot(moveX, moveZ);
+  const isMoving = inputDist > 0.08;
+
+  if (isMoving) {
+    const spd = G.upgrades.moveSpeed.getValue(G.upgrades.moveSpeed.level);
+    const nx = moveX / inputDist;
+    const nz = moveZ / inputDist;
+
+    player.position.x += nx * spd * dt;
+    player.position.z += nz * spd * dt;
+
+    // Bounds limit
+    player.position.x = Math.max(-27, Math.min(27, player.position.x));
+    player.position.z = Math.max(-9.5, Math.min(9.5, player.position.z));
+
+    // Smooth rotation facing movement
+    const targetAngle = Math.atan2(nx, -nz);
+    player.rotation.y = THREE.MathUtils.lerp(player.rotation.y, targetAngle, 12 * dt);
+
+    // Walking animation for legs
+    const walkPhase = now * 0.012;
+    legL.position.y = 0.3 + Math.sin(walkPhase) * 0.15;
+    legR.position.y = 0.3 - Math.sin(walkPhase) * 0.15;
+
+    // Comical Head Stack Sway
+    stackGroup.rotation.z = Math.sin(now * 0.009) * 0.12 - (nx * 0.1);
+    stackGroup.rotation.x = Math.cos(now * 0.009) * 0.12 + (nz * 0.1);
+  } else {
+    legL.position.y = 0.3;
+    legR.position.y = 0.3;
+    stackGroup.rotation.set(0, 0, 0);
+  }
+
+  // ─── 2. SCRAP COLLECTION AT JUNKYARD ─────────────────────────────
+  const stackCap = G.upgrades.stackCap.getValue(G.upgrades.stackCap.level);
+  for (let i = scrapItems.length - 1; i >= 0; i--) {
+    const s = scrapItems[i];
+    const distSq = (player.position.x - s.position.x)**2 + (player.position.z - s.position.z)**2;
+    if (distSq < 3.2 && playerStack < stackCap) {
+      playerStack++;
+      updateStackVisuals();
+      playSound('clunk');
+      spawnSparks(s.position.x, 0.8, s.position.z, 0x9b542e, 7, 3);
+      scene.remove(s);
+      scrapItems.splice(i, 1);
+
+      if (G.tutorialStep === 0) {
+        G.tutorialStep = 1;
+        showTutorial('📦 Towering scrap stack! Carry it to the INTAKE HOPPER (middle)!');
+      }
+    }
+  }
+
+  // Respawn scrap nodes periodically
+  if (now - lastScrapSpawn > 2200) {
+    lastScrapSpawn = now;
+    spawnScrapNode();
+  }
+
+  // ─── 3. DUMPING STACK INTO HOPPER ────────────────────────────────
+  if (playerStack > 0) {
+    const hopperDistSq = (player.position.x - (-6))**2 + (player.position.z - 0)**2;
+    if (hopperDistSq < 4.5) {
+      // Dump items into conveyor
+      const count = playerStack;
+      playerStack = 0;
+      updateStackVisuals();
+
+      playSound('dump');
+      spawnSparks(-6, 2.5, 0, 0x00f0ff, 12, 4);
+
+      for (let i = 0; i < count; i++) {
+        setTimeout(() => feedHopper(), i * 160);
+      }
+
+      if (G.tutorialStep === 1) {
+        G.tutorialStep = 2;
+        showTutorial('⚡ Watch the Chrome Tunnel restore the vehicle at high speed!');
+      }
+    }
+  }
+
+  // ─── 4. CHROME TUNNEL PROCESSING ─────────────────────────────────
+  for (let i = conveyorQueue.length - 1; i >= 0; i--) {
+    const item = conveyorQueue[i];
+    const elapsed = now - item.startTime;
+    const progress = Math.min(elapsed / item.duration, 1.0);
+
+    // Belt translation: moves from x: -5.5 to x: 7.5
+    item.mesh.position.x = -5.5 + progress * 13.0;
+    item.mesh.rotation.y += dt * 3.5;
+
+    // Visual Instant-Polish Transformation:
+    // Rust brown -> Gleaming Chrome & Neon
+    if (progress < 0.4) {
+      item.mesh.scale.setScalar(0.7 + progress * 0.2);
+    } else if (progress >= 0.4 && progress < 0.85) {
+      // Stripping rust & laser welding
+      if (Math.random() < 0.25) {
+        playSound('laser');
+        spawnSparks(item.mesh.position.x, 1.3, 0, 0x00f0ff, 4, 3);
+      }
+    }
+
+    if (progress >= 1.0) {
+      // Exit tunnel -> Deliver to Showroom Pedestal
+      scene.remove(item.mesh);
+      conveyorQueue.splice(i, 1);
+
+      deliverToPedestal();
+      G.totalBuilt++;
+      playSound('ding');
+      spawnSparks(7.5, 1.2, 0, 0xffea00, 15, 5);
+
+      if (G.tutorialStep === 2) {
+        G.tutorialStep = 3;
+        showTutorial('💰 VIPs are bidding! Vacuum up their cash drops & upgrade!');
+      }
+    }
+  }
+
+  // ─── 5. SHOWROOM PEDESTALS ROTATION & DISPLAY ────────────────────
+  pedestals.forEach(p => {
+    if (p.carMesh) {
+      p.carMesh.rotation.y += dt * 0.9;
+      // Animate propeller if plane
+      const prop = p.carMesh.getObjectByName('propeller');
+      if (prop) prop.rotation.x += dt * 25;
+    }
+  });
+
+  // ─── 6. VIP BIDDERS BEHAVIOR ─────────────────────────────────────
+  vipTimer += dt * 1000;
+  if (vipTimer > VIP_INTERVAL) {
+    vipTimer = 0;
+    spawnVIPBidder();
+  }
+
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const n = npcs[i];
+    if (n.role === 'vip') {
+      if (n.state === 'walking') {
+        const dx = n.dest.x - n.mesh.position.x;
+        const dz = n.dest.z - n.mesh.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.4) {
+          n.mesh.position.x += (dx / dist) * n.speed * dt;
+          n.mesh.position.z += (dz / dist) * n.speed * dt;
+          n.mesh.rotation.y = Math.atan2(dx, dz);
+        } else {
+          n.state = 'bidding';
+          n.timer = 0;
+        }
+      } else if (n.state === 'bidding') {
+        n.timer += dt;
+        // Jump animation
+        n.mesh.position.y = Math.abs(Math.sin(n.timer * 8)) * 0.35;
+
+        if (n.timer > 1.2) {
+          // Finalize purchase
+          if (n.targetPedestal.occupied && n.targetPedestal.carMesh) {
+            const conf = PHASE_CONFIGS[G.phase];
+            const tData = conf.tiers[n.targetPedestal.tier - 1];
+            const baseAmount = Math.floor(tData.min + Math.random() * (tData.max - tData.min));
+            const totalSale = Math.floor(baseAmount * G.prestigeMultiplier);
+
+            // Drop cash bundles
+            const bundles = 3;
+            for (let b = 0; b < bundles; b++) {
+              dropCashStack(
+                n.targetPedestal.pos.x + (Math.random() - 0.5) * 2.5,
+                n.targetPedestal.pos.z + (Math.random() - 0.5) * 2.5,
+                Math.floor(totalSale / bundles)
+              );
+            }
+
+            // Remove vehicle from pedestal
+            scene.remove(n.targetPedestal.carMesh);
+            n.targetPedestal.carMesh = null;
+            n.targetPedestal.occupied = false;
+          }
+
+          n.state = 'leaving';
+          n.dest = new THREE.Vector3(n.mesh.position.x + 8, 0, n.mesh.position.z + (Math.random() - 0.5) * 4);
+        }
+      } else if (n.state === 'leaving') {
+        const dx = n.dest.x - n.mesh.position.x;
+        const dz = n.dest.z - n.mesh.position.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.4) {
+          n.mesh.position.x += (dx / dist) * n.speed * dt;
+          n.mesh.position.z += (dz / dist) * n.speed * dt;
+        } else {
+          scene.remove(n.mesh);
+          npcs.splice(i, 1);
+        }
+      }
+    }
+  }
+
+  // ─── 7. HELPER MINIONS AUTOMATION ────────────────────────────────
+  helperMinions.forEach(h => {
+    if (h.state === 'scavenge') {
+      if (scrapItems.length > 0 && h.carrying < h.cap) {
+        // Find nearest scrap
+        let best = null, bestDist = Infinity;
+        scrapItems.forEach(s => {
+          const d = (h.mesh.position.x - s.position.x)**2 + (h.mesh.position.z - s.position.z)**2;
+          if (d < bestDist) { bestDist = d; best = s; }
+        });
+
+        if (best) {
+          const dx = best.position.x - h.mesh.position.x;
+          const dz = best.position.z - h.mesh.position.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 0.6) {
+            h.mesh.position.x += (dx / dist) * h.speed * dt;
+            h.mesh.position.z += (dz / dist) * h.speed * dt;
+            h.mesh.rotation.y = Math.atan2(dx, dz);
+          } else {
+            // Pick up
+            const idx = scrapItems.indexOf(best);
+            if (idx >= 0) {
+              scene.remove(best);
+              scrapItems.splice(idx, 1);
+              h.carrying++;
+
+              const visual = createScrapMesh(G.phase);
+              visual.scale.setScalar(0.35);
+              visual.position.set(0, (h.carrying - 1) * 0.4, 0);
+              h.stackNode.add(visual);
+            }
+          }
+        }
+      }
+      if (h.carrying >= h.cap || (scrapItems.length === 0 && h.carrying > 0)) {
+        h.state = 'deliver';
+      }
+    } else if (h.state === 'deliver') {
+      const dx = -6 - h.mesh.position.x;
+      const dz = 0 - h.mesh.position.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 1.2) {
+        h.mesh.position.x += (dx / dist) * h.speed * dt;
+        h.mesh.position.z += (dz / dist) * h.speed * dt;
+        h.mesh.rotation.y = Math.atan2(dx, dz);
+      } else {
+        // Dump at hopper
+        for (let i = 0; i < h.carrying; i++) {
+          setTimeout(() => feedHopper(), i * 150);
+        }
+        h.carrying = 0;
+        while (h.stackNode.children.length) h.stackNode.remove(h.stackNode.children[0]);
+        h.state = 'scavenge';
+      }
+    }
+  });
+
+  // ─── 8. CASH BUNDLE VACUUM COLLECTION ────────────────────────────
+  const vacRadius = G.upgrades.vacuumRad.getValue(G.upgrades.vacuumRad.level);
+  for (let i = cashBundles.length - 1; i >= 0; i--) {
+    const c = cashBundles[i];
+    // Arc physics when spawned
+    if (!c.grounded) {
+      c.mesh.position.x += c.vx * dt;
+      c.mesh.position.y += c.vy * dt;
+      c.mesh.position.z += c.vz * dt;
+      c.vy -= 16 * dt; // Gravity
+      if (c.mesh.position.y <= 0.3) {
+        c.mesh.position.y = 0.3;
+        c.grounded = true;
+      }
+    } else {
+      c.mesh.rotation.y += dt * 3.5;
+      c.mesh.position.y = 0.3 + Math.sin(now * 0.006 + c.birth) * 0.1;
+    }
+
+    // Distance to player
+    const dx = player.position.x - c.mesh.position.x;
+    const dz = player.position.z - c.mesh.position.z;
+    const dist = Math.hypot(dx, dz);
+
+    if (dist < vacRadius) {
+      // Lerp toward boss vacuum
+      const pull = 10.5;
+      c.mesh.position.x += (dx / dist) * pull * dt;
+      c.mesh.position.z += (dz / dist) * pull * dt;
+
+      if (dist < 1.1) {
+        // Collect!
+        G.cash += c.amount;
+        playSound('cash');
+        spawnFloatTag(c.mesh.position, '+' + formatCash(c.amount));
+        spawnSparks(c.mesh.position.x, 0.8, c.mesh.position.z, 0x39ff74, 5, 2);
+
+        scene.remove(c.mesh);
+        cashBundles.splice(i, 1);
+
+        refreshUpgradeCards();
+        updateHUD();
+      }
+    }
+  }
+
+  // ─── 9. PARTICLES SIMULATION ─────────────────────────────────────
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      scene.remove(p.mesh);
+      particles.splice(i, 1);
+      continue;
+    }
+    p.mesh.position.x += p.vx * dt;
+    p.mesh.position.y += p.vy * dt;
+    p.mesh.position.z += p.vz * dt;
+    p.vy -= 8 * dt; // Gravity
+    const s = (p.life / p.maxLife) * 0.28;
+    p.mesh.scale.setScalar(s);
+  }
+
+  // ─── 10. ROBOTIC ARMS & DRONES OSCILLATION ───────────────────────
+  roboticArms.forEach(a => {
+    const swing = Math.sin(now * 0.003 * a.group.userData.speed + a.group.userData.phase) * 0.55;
+    a.group.rotation.z = swing;
+  });
+
+  polishDrones.forEach(d => {
+    d.mesh.position.y = 3.2 + Math.sin(now * 0.003 + d.phase) * 0.45;
+    d.mesh.rotation.y += dt * 3;
+    d.mesh.rotation.x += dt * 2;
+  });
+
+  // ─── 11. SMOOTH CAMERA FOLLOW ────────────────────────────────────
+  const targetCamPos = new THREE.Vector3(
+    player.position.x * 0.75,
+    player.position.y + 16,
+    player.position.z + 14
+  );
+  camera.position.lerp(targetCamPos, 5 * dt);
+  camera.lookAt(player.position.x * 0.75, 1.2, player.position.z);
+
+  // ─── 12. RENDER SCENE ────────────────────────────────────────────
+  renderer.render(scene, camera);
+}
+
+function deliverToPedestal() {
+  const tier = getCurrentTier();
+  const available = pedestals.filter(p => !p.occupied);
+  if (available.length === 0) return;
+  const p = available[0];
+
+  p.occupied = true;
+  p.tier = tier;
+  const vehicle = createVehicleMesh(G.phase, tier);
+  vehicle.position.set(p.pos.x, 0.65, p.pos.z);
+  scene.add(vehicle);
+  p.carMesh = vehicle;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RESIZE & BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════════════════
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const startScreenEl = document.getElementById('start-screen');
+
+function startGameSession() {
+  ensureAudio();
+  startScreenEl.style.display = 'none';
+
+  buildEnvironment(0);
+  rebuildTunnelStructure();
+  buildUpgradeDock();
+  updateHUD();
+
+  showTutorial('🕹️ Drag joystick to move your Boss to the SCRAPYARD (left)!');
+
+  lastTime = performance.now();
+  requestAnimationFrame(mainLoop);
+}
+
+startScreenEl.addEventListener('click', startGameSession);
+startScreenEl.addEventListener('touchstart', e => {
+  e.preventDefault();
+  startGameSession();
+}, { passive: false });
+
+</script>
+</body>
+</html>
