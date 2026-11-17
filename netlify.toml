@@ -1,0 +1,5 @@
+# The game lives in the rust-and-chrome/ subfolder, not the repo root.
+# No build step: Netlify just serves the static files from that folder.
+[build]
+  publish = "rust-and-chrome"
+  command = ""
